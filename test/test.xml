@@ -1,23 +1,21 @@
 <root>
-    
-    550<order id  =    "1111 "> 
-              
-        <amount>150
 
-        </amount>
+    <order id="1111" new="a13">
+
+        <amount>150</amount>
 
     </order>
 
-    <order id="222 " lex="aaa">
+    <order id="222">
 
-        ><amoun2t> </amoun2t><amount></amount>600
-
-    </order>
-
-   >>>> <order id="333">
-
-        <amount>2.000.</amount>
+        <amount>2</amount>
 
     </order>
 
-</root> 
+    <order id="">
+
+        <amount>2000</amount>
+
+    </order>
+
+</root>
