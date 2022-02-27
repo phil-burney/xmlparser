@@ -1,111 +1,58 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::hash_map::HashMap;
+use std::cell::{RefCell, RefMut};
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::env;
-use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-#[derive(Clone, Debug)]
-struct XMLElement {
-    tag: String,
-    props: HashMap<String, String>,
-    children: Vec<XMLElement>,
-    inner_text: String,
-}
-impl fmt::Display for XMLElement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut map = String::new();
-        for key in &self.props {
-            map.push_str(&key.0);
-            map.push('=');
-            map.push_str(&key.1);
-            map.push_str("; ");
-        }
-        let mut children = String::new();
-        for child in &self.children {
-            children.push_str(&child.to_string());
-        }
-        write!(f, "\n\ttag: {} \n\tprops: {} \n\tchildren: {}", self.tag, map, children)
-    }
-}
 
-impl XMLElement {
-    fn new(tag: String, props: HashMap<String, String>) -> XMLElement {
-        return XMLElement {
-            tag: String::from(tag),
-            props: props,
-            children: Vec::new(),
-            inner_text: String::new(),
-        };
-    }
-    fn add_child(&mut self, child: XMLElement) {
-        self.children.push(child);
-    }
-    fn add_property(&mut self, key: String, value: String) {
-        self.props.insert(key, value);
-    }
-    fn add_text(&mut self, text: String) {
-        self.inner_text = text;
-    }
-}
-struct XMLTree {
-    root: Option<XMLElement>,
-    current_path: Vec<*mut XMLElement>
-}
+mod xml_element;
+mod xml_tree;
+
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let file = File::open(&args[1]).unwrap();
     let reader = BufReader::new(file);
-    let mut path: Vec<String> = Vec::new();
-    let mut path_map: HashMap<Vec<String>, Vec<XMLElement>> = HashMap::new();
-    let mut pos: Vec<Box<XMLElement>> = Vec::new();
+    // let mut path: Vec<String> = Vec::new();
+    // let mut path_map: HashMap<Vec<String>, Vec<XMLElement>> = HashMap::new();
+    // let mut pos: Vec<Box<XMLElement>> = Vec::new();
+    let mut tree = XMLTree {
+        root: None,
+        current_path: Vec::new()
+    };
     // Read the file line by line using the lines() iterator from std::io::BufRead.
     for (index, line) in reader.lines().enumerate() {
         let mut line = line.unwrap();
 
-        processing_router(line, &mut path, &mut path_map);
+        processing_router(line, &mut tree);
         // else if text.is_match(&line){
         //     x = handle_text(line);
         // }
 
-        //  println!("{}", x);
     }
-    let mut map = String::new();
-    map.push_str("------------- \n");
-    map.push_str("RESULTS: \n");
-    for key in path_map {
-        map.push_str("path: ");
-        //map.push_str(&key.);
-        map.push_str("\nresidents:");
-        for ele in &key.1 {
-            map.push_str(&ele.to_string());
-            map.push(',');
-        }
-        map.push('\n');
-    }
-    println!("{}", map);
+    print!("{}", tree);
+    
 }
-fn processing_router(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
+fn processing_router(line: String, tree: &mut XMLTree) {
     lazy_static! {
         static ref OPEN_BRACKET: Regex = Regex::new("[^<]").unwrap();
     }
     let trim_line = line.trim();
-    // if !trim_line.is_empty(){
-    //     println!("{}", trim_line);
-    // }
 
     if trim_line.is_empty() {
         return; // no need to continue execution on this line
     } else if trim_line.starts_with("</") {
-        handle_exit_tag(trim_line.to_string(), path, map);
+        handle_exit_tag(trim_line.to_string(), tree);
     } else if trim_line.starts_with("<") {
-        handle_entry_tag(trim_line.to_string(), path, map);
+        handle_entry_tag(trim_line.to_string(), tree);
     } else if OPEN_BRACKET.is_match(&trim_line) {
-        handle_characters(trim_line.to_string(), path, map);
+        handle_characters(trim_line.to_string(), tree);
     }
 }
 
-fn handle_entry_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>)  {
+fn handle_entry_tag(line: String, tree: &mut XMLTree)  {
     lazy_static! {
         static ref RE1: Regex = Regex::new(r#"<[a-z]+[a-z0-9]*( *[a-z]+[a-z0-9 ]*="[a-z0-9 ]*")*>"#).unwrap();
         static ref RE2: Regex = Regex::new(r"<[a-z]+[a-z0-9]*").unwrap();
@@ -123,49 +70,41 @@ fn handle_entry_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<
     let new_line = line.strip_prefix(full_tag_ptr).expect(&line.to_string());
     // Get tag name
     let loc = potential_props_prefix.strip_prefix('<').unwrap();
-    // Push location to current path
-    path.push(loc.to_string());
-    //
-    let element = XMLElement::new(loc.to_string(), prop_map);
-    let element2 = element.clone();
-
-    let mut par_path = path.clone();
-    par_path.pop();
-
-   
-
-    let x = path.clone();
-
-    if map.get(path).is_none() {
-        map.insert(x, Vec::new());
-    }
-    let vec = map.get_mut(path).unwrap();
-
     
+    let element = XMLElement::new(loc.to_string(), prop_map);
+   
+    if tree.root.is_none() {
+        let x =  tree.root.insert(Rc::new(RefCell::new(element)));
+        tree.current_path.push(Rc::clone(x));
+    } else {
+        let parent = tree.current_path.last_mut().unwrap();
+        // Create element wrapper
+        let elem_wrapper = Rc::new(RefCell::new(element));
+        let elem_wrapper_2 = Rc::clone(&elem_wrapper);
 
-    vec.push(element2);
-
-    //   println!("Element found: {} \nIts path is: {}", vec.last().unwrap(), translate_path(path).as_str());
-
+        RefCell::try_borrow_mut(parent).unwrap().add_child(elem_wrapper);
+        // Push clone of that wrapper to the current path
+        tree.current_path.push(elem_wrapper_2);
+    }
     // Return contents of the entry tag
-    processing_router(new_line.to_string(), path, map);
+    processing_router(new_line.to_string(), tree);
 }
-fn handle_exit_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
+fn handle_exit_tag(line: String, tree: &mut XMLTree) {
     lazy_static! {
         static ref RE1: Regex = Regex::new(r#"</[a-z]+[a-z0-9]*>"#).unwrap();
         static ref RE2: Regex = Regex::new(r"[a-z]+[a-z0-9]*").unwrap();
     }
 
-    // Find entry tag in its entirety
+    // Find exit tag in its entirety
     let y = RE1.captures(&line).expect(&line).get(0).unwrap().as_str();
-    // Get contents after the entry tag
+    // Get contents after the exit tag
     let b = line.strip_prefix(y).expect(&line);
-    // Return contents of the entry tag
-    path.pop();
-    processing_router(b.to_string(), path, map);
+    // Return contents of the exit tag
+    processing_router(b.to_string(), tree);
+    tree.current_path.pop();
 }
 
-fn handle_characters(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
+fn handle_characters(line: String, tree: &mut XMLTree) {
     lazy_static! {
         static ref RE1: Regex = Regex::new(r"[^\s&<]+").unwrap();
     }
@@ -175,8 +114,11 @@ fn handle_characters(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec
     let x: Vec<&str> = line.splitn(2, y).collect();
     // Get the characters in the line after the character string
     let a = x.get(1).unwrap();
-    //println!("{}", a);
-    processing_router(a.to_string(), path, map);
+
+    let root_cell = tree.current_path.last().unwrap();
+    RefCell::try_borrow_mut(root_cell).unwrap().add_text(y.to_string());
+
+    processing_router(a.to_string(), tree);
 }
 
 fn handle_properties(potential_props: String, prop_map: &mut HashMap<String, String>) {
@@ -198,12 +140,3 @@ fn handle_properties(potential_props: String, prop_map: &mut HashMap<String, Str
     handle_properties(props.to_string(), prop_map);
 }
 
-fn translate_path(path: &mut Vec<String>) -> String {
-    let mut s = String::new();
-    for location in path {
-        s.push_str(location);
-        s.push('/');
-    }
-    s.truncate(s.len() - 1);
-    return s;
-}
