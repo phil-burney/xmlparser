@@ -5,9 +5,6 @@ use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"[a-z]+[a-z1-9]*>").unwrap();
-}
 #[derive(Clone, Debug)]
 struct XMLElement {
     tag: String,
@@ -51,19 +48,22 @@ impl XMLElement {
         self.inner_text = text;
     }
 }
-
+struct XMLTree {
+    root: Option<XMLElement>,
+    current_path: Vec<*mut XMLElement>
+}
 fn main() {
     let args: Vec<String> = env::args().collect();
     let file = File::open(&args[1]).unwrap();
     let reader = BufReader::new(file);
     let mut path: Vec<String> = Vec::new();
-    let mut path_map: HashMap< String, Vec<XMLElement>> = HashMap::new();
-    let mut pos: Vec< &XMLElement> = Vec::new();
+    let mut path_map: HashMap<Vec<String>, Vec<XMLElement>> = HashMap::new();
+    let mut pos: Vec<Box<XMLElement>> = Vec::new();
     // Read the file line by line using the lines() iterator from std::io::BufRead.
     for (index, line) in reader.lines().enumerate() {
         let mut line = line.unwrap();
 
-        processing_router(line, &mut path, &mut path_map, &mut pos);
+        processing_router(line, &mut path, &mut path_map);
         // else if text.is_match(&line){
         //     x = handle_text(line);
         // }
@@ -75,7 +75,7 @@ fn main() {
     map.push_str("RESULTS: \n");
     for key in path_map {
         map.push_str("path: ");
-        map.push_str(&key.0);
+        //map.push_str(&key.);
         map.push_str("\nresidents:");
         for ele in &key.1 {
             map.push_str(&ele.to_string());
@@ -85,9 +85,9 @@ fn main() {
     }
     println!("{}", map);
 }
-fn processing_router(line: String, path: &mut Vec<String>, map: &mut HashMap<String, Vec<XMLElement>>, pos: &mut Vec<&XMLElement>) {
+fn processing_router(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
     lazy_static! {
-        static ref RE1: Regex = Regex::new("[^<]").unwrap();
+        static ref OPEN_BRACKET: Regex = Regex::new("[^<]").unwrap();
     }
     let trim_line = line.trim();
     // if !trim_line.is_empty(){
@@ -97,20 +97,20 @@ fn processing_router(line: String, path: &mut Vec<String>, map: &mut HashMap<Str
     if trim_line.is_empty() {
         return; // no need to continue execution on this line
     } else if trim_line.starts_with("</") {
-        handle_exit_tag(trim_line.to_string(), path, map, pos);
+        handle_exit_tag(trim_line.to_string(), path, map);
     } else if trim_line.starts_with("<") {
-        handle_entry_tag(trim_line.to_string(), path, map, pos);
-    } else if RE1.is_match(&trim_line) {
-        handle_characters(trim_line.to_string(), path, map, pos);
+        handle_entry_tag(trim_line.to_string(), path, map);
+    } else if OPEN_BRACKET.is_match(&trim_line) {
+        handle_characters(trim_line.to_string(), path, map);
     }
 }
 
-fn handle_entry_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<String, Vec<XMLElement>>, pos: &mut Vec<&XMLElement>) {
+fn handle_entry_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>)  {
     lazy_static! {
-        static ref RE1: Regex = Regex::new(r#"<[a-z]+[a-z1-9]*( {0,}?[a-z]+[a-z1-9] {0,}?= {0,}"[a-z1-9 ]{0,}?")*?>"#).unwrap();
-        static ref RE2: Regex = Regex::new(r"<[a-z]+[a-z1-9]*").unwrap();
+        static ref RE1: Regex = Regex::new(r#"<[a-z]+[a-z0-9]*( *[a-z]+[a-z0-9 ]*="[a-z0-9 ]*")*>"#).unwrap();
+        static ref RE2: Regex = Regex::new(r"<[a-z]+[a-z0-9]*").unwrap();
     }
-    // Find entry tag in its entirety
+    // Find entry tag in its entirety   
     let full_tag_ptr = RE1.captures(&line).expect(&line).get(0).unwrap().as_str();
     // Get the tag name from the entry tag
     let potential_props_prefix = RE2.captures(&full_tag_ptr).expect(&full_tag_ptr).get(0).unwrap().as_str();
@@ -122,31 +122,38 @@ fn handle_entry_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Stri
     handle_properties(potential_props, &mut prop_map);
     let new_line = line.strip_prefix(full_tag_ptr).expect(&line.to_string());
     // Get tag name
-    let loc = potential_props_prefix.strip_prefix("<").unwrap();
+    let loc = potential_props_prefix.strip_prefix('<').unwrap();
     // Push location to current path
     path.push(loc.to_string());
     //
-    let path_str = translate_path(path);
-    let mut element = XMLElement::new(loc.to_string(), prop_map);
+    let element = XMLElement::new(loc.to_string(), prop_map);
+    let element2 = element.clone();
+
+    let mut par_path = path.clone();
+    par_path.pop();
+
+   
+
+    let x = path.clone();
+
+    if map.get(path).is_none() {
+        map.insert(x, Vec::new());
+    }
+    let vec = map.get_mut(path).unwrap();
 
     
 
-    if map.get(&path_str).is_none() {
-        map.insert(path_str, Vec::new());
-    }
-    let vec = map.get_mut(&translate_path(path)).unwrap();
+    vec.push(element2);
 
-    vec.push(element);
-    //pos.push();
-    println!("Element found: {} \nIts path is: {}", vec.last().unwrap(), translate_path(path).as_str());
+    //   println!("Element found: {} \nIts path is: {}", vec.last().unwrap(), translate_path(path).as_str());
 
     // Return contents of the entry tag
-    processing_router(new_line.to_string(), path, map, pos);
+    processing_router(new_line.to_string(), path, map);
 }
-fn handle_exit_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<String, Vec<XMLElement>>, pos: &mut Vec<&XMLElement>) {
+fn handle_exit_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
     lazy_static! {
-        static ref RE1: Regex = Regex::new(r#"</[a-z]+[a-z1-9]*>"#).unwrap();
-        static ref RE2: Regex = Regex::new(r"[a-z]+[a-z1-9]*").unwrap();
+        static ref RE1: Regex = Regex::new(r#"</[a-z]+[a-z0-9]*>"#).unwrap();
+        static ref RE2: Regex = Regex::new(r"[a-z]+[a-z0-9]*").unwrap();
     }
 
     // Find entry tag in its entirety
@@ -155,10 +162,10 @@ fn handle_exit_tag(line: String, path: &mut Vec<String>, map: &mut HashMap<Strin
     let b = line.strip_prefix(y).expect(&line);
     // Return contents of the entry tag
     path.pop();
-    processing_router(b.to_string(), path, map, pos);
+    processing_router(b.to_string(), path, map);
 }
 
-fn handle_characters(line: String, path: &mut Vec<String>, map: &mut HashMap<String, Vec<XMLElement>>, pos: &mut Vec<&XMLElement>) {
+fn handle_characters(line: String, path: &mut Vec<String>, map: &mut HashMap<Vec<String>, Vec<XMLElement>>) {
     lazy_static! {
         static ref RE1: Regex = Regex::new(r"[^\s&<]+").unwrap();
     }
@@ -169,13 +176,13 @@ fn handle_characters(line: String, path: &mut Vec<String>, map: &mut HashMap<Str
     // Get the characters in the line after the character string
     let a = x.get(1).unwrap();
     //println!("{}", a);
-    processing_router(a.to_string(), path, map, pos);
+    processing_router(a.to_string(), path, map);
 }
 
 fn handle_properties(potential_props: String, prop_map: &mut HashMap<String, String>) {
     lazy_static! {
-        static ref RE1: Regex = Regex::new(r#"[a-z]+[a-z1-9] {0,}?= *"[a-z1-9 ]*""#).unwrap();
-        static ref RE2: Regex = Regex::new(r"[a-z]+[a-z1-9]*").unwrap();
+        static ref RE1: Regex = Regex::new(r#"[a-z]+[a-z0-9] {0,}?= *"[a-z0-9 ]*""#).unwrap();
+        static ref RE2: Regex = Regex::new(r"[a-z]+[a-z0-9]*").unwrap();
     }
     let potential_props_trim = potential_props.trim();
     if potential_props_trim.eq(">") {
