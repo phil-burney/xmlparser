@@ -13,7 +13,7 @@ fn main() {
     // Get an XML tree to work with 
     let now = SystemTime::now();
     let tree = xml_parser::parse_xml_to_tree(&args[1]);
-  //  print!("{}", tree);
+    // print!("{}", tree);
     match now.elapsed() {
         Ok(elapsed) => {
             println!("Tree Built in: {}ms", elapsed.as_millis());
@@ -27,15 +27,16 @@ fn main() {
 
     // This function uses the XMLTree to achieve the function
     let tree_info = get_relevant_orders_by_tree(&tree);
-  //  print_results(tree_info);
+    print_results(tree_info);
     // This function uses the paths functionality to achieve the functionality
     let path_info = get_relevant_orders_by_path(&tree, "/root/order".to_string());
     println!("\n");
-   // print_results(path_info);
+    print_results(path_info);
     
     println!("Program completed");
     
 }
+/// Prints the results of the functions that find the IDs of all the orders that have amounts greater than 100
 fn print_results(vec: Vec<(String, String)>) {
     println!("id    |  amount ");
     println!("----------------");
@@ -45,7 +46,7 @@ fn print_results(vec: Vec<(String, String)>) {
     }
 }
 /// Gets all the orders within the XML file that have amounts with inner text that are greater than 100.
-/// Returns the vector.  To do so, the user has to access the XML tree.    
+/// Returns the vector.  To do so, the user has to access the XML tree, and must use the XML tree.   
 fn get_relevant_orders_by_tree(tree: &XMLTree) -> Vec<(String, String)>{
     // Get the root of the given tree 
     let root = &tree.get_root();
@@ -71,7 +72,8 @@ fn get_relevant_orders_by_tree(tree: &XMLTree) -> Vec<(String, String)>{
     }
     return relevant_orders;
 }
-
+/// Finds the relevant orders based on the given path.  The orders must still be greater than 100, but 
+/// the user only needs to add a path instead of interacting with the DOM Tree.  
 fn get_relevant_orders_by_path(tree: &XMLTree, path: String) -> Vec<(String, String)>{
     // Get the root of the given tree 
     let orders = tree.get_elements_at_path(path).unwrap();

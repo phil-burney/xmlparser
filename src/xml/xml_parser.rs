@@ -53,7 +53,7 @@ fn processing_router(line: &str, tree: &mut XMLTree) {
 }
 /// Handles any entry tags that the machine comes across.  The method matches the full opening tag 
 /// with regex, and then looks for just the '<' and the tag name.  Upon finding this, the method strips the
-/// tag name off of the line, and sends the remainining line to another method to get any properties.  
+/// tag name off of the line, and uses the remaining line to get any properties.  
 /// The '<' and the tag name is then used to create an XMLElement, which is then added to the XMLTree.
 /// The newly created XMLElement is added to the XMLTree's path for easy tracking.  After this, the line passed
 /// in is stripped of the information already processed, and the modified line is sent to the processor.       
@@ -61,20 +61,24 @@ fn handle_entry_tag(line: &str, tree: &mut XMLTree)  {
     // Find entry tag in its entirety   
     let full_tag_itr: Vec<&str> = line.split_inclusive('>').collect();
     let full_tag_ptr = full_tag_itr[0];
+    // Get any potential new properties
     let potential_props_itr: Vec<&str> = full_tag_ptr.split_whitespace().collect();
     let potential_props_prefix_1;
-
+    // Create the vector that will hold the properties
     let mut prop_map = Vec::new();
-
+    // If there are no properties, trim the end of the XML tag.  
     if potential_props_itr.len() == 1 {
         potential_props_prefix_1 = potential_props_itr[0].trim_end_matches('>');
-    } else {
+    } 
+    // Otherwise, process the properties!
+    else {
        // potential_props_prefix_1 = potential_props_itr.get(0).unwrap();
         potential_props_prefix_1 = potential_props_itr[0];
         // Create a string without the tag name, leaving property information behind.
         let potential_props = full_tag_ptr.strip_prefix(potential_props_prefix_1).unwrap().to_string();
-        //let potential_props = line.strip_prefix(full_tag_ptr).unwrap().to_string();
+        // Trim the end of the XML tag to make sure that any properties are free of whitespace and the '>'
         let potential_props_trim = potential_props.trim_end_matches(|c| c == ' ' || c == '>');
+        // Collect the properties and process them, adding them to what will become the properties field of the node
         let props: Vec<&str> = potential_props_trim.split_ascii_whitespace().collect();
         for prop in props {
             let tuple = prop.split_once("=").unwrap();
