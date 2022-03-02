@@ -11,6 +11,7 @@ fn main() {
     // Get an XML tree to work with 
     let now = SystemTime::now();
     let tree = xml_parser::parse_xml_to_tree(&args[1]);
+  //  print!("{}", tree);
     match now.elapsed() {
         Ok(elapsed) => {
             println!("Tree Built in: {}ms", elapsed.as_millis());
@@ -24,7 +25,7 @@ fn main() {
 
     // This function uses the XMLTree to achieve the function
     let tree_info = get_relevant_orders_by_tree(&tree);
-   // print_results(tree_info);
+  //  print_results(tree_info);
     // This function uses the paths functionality to achieve the functionality
     let path_info = get_relevant_orders_by_path(&tree, "/root/order".to_string());
     println!("\n");

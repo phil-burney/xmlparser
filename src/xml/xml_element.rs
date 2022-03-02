@@ -95,7 +95,7 @@ impl XMLElement {
         }
         for child in children {
             let mut map = String::new();
-            for key in &self.props {
+            for key in child.get_props() {
                 map.push_str(&key.0);
                 map.push('=');
                 map.push_str(&key.1);
