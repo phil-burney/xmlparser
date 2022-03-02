@@ -1,0 +1,21 @@
+<root>
+
+    <order id="1111" new="a13">
+
+        <amount>99</amount>
+
+    </order>
+
+    <order id="222">
+
+        <amount>100</amount>
+
+    </order>
+
+    <order id="22">
+
+        <amount id="420">101</amount>
+
+    </order>
+
+</root>

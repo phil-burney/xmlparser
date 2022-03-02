@@ -3,6 +3,8 @@ use xml::xml_parser;
 mod xml;
 use std::env;
 use std::time::SystemTime;
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     println!("Program started");

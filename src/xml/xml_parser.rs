@@ -24,7 +24,7 @@ pub fn parse_xml_to_tree(file_path: &str) -> XMLTree {
         let line = line.unwrap();
         // Once the line is known, pass the line to the state machine router, along with the 
         // tree
-        processing_router(line, &mut tree);
+        processing_router(line.as_str(), &mut tree);
 
 
     }
@@ -37,7 +37,7 @@ pub fn parse_xml_to_tree(file_path: &str) -> XMLTree {
 ///     *The method encounters an ending tag -> handle the ending tag
 ///     *The method encounters regular text -> handle the inner text
 ///     *The method encounters a empty line -> return to the main function
-fn processing_router(line: String, tree: &mut XMLTree) {
+fn processing_router(line: &str, tree: &mut XMLTree) {
 
     let trim_line = line.trim();
 
@@ -67,12 +67,12 @@ fn handle_entry_tag(line: &str, tree: &mut XMLTree)  {
     let mut prop_map = Vec::new();
 
     if potential_props_itr.len() == 1 {
-        potential_props_prefix_1 = potential_props_itr.get(0).unwrap().trim_end_matches('>');
+        potential_props_prefix_1 = potential_props_itr[0].trim_end_matches('>');
     } else {
        // potential_props_prefix_1 = potential_props_itr.get(0).unwrap();
-        potential_props_prefix_1 = potential_props_itr.get(0).unwrap();
+        potential_props_prefix_1 = potential_props_itr[0];
         // Create a string without the tag name, leaving property information behind.
-        let potential_props = full_tag_ptr.to_string().strip_prefix(potential_props_prefix_1).unwrap().to_string();
+        let potential_props = full_tag_ptr.strip_prefix(potential_props_prefix_1).unwrap().to_string();
         //let potential_props = line.strip_prefix(full_tag_ptr).unwrap().to_string();
         let potential_props_trim = potential_props.trim_end_matches(|c| c == ' ' || c == '>');
         let props: Vec<&str> = potential_props_trim.split_ascii_whitespace().collect();
@@ -109,26 +109,23 @@ fn handle_entry_tag(line: &str, tree: &mut XMLTree)  {
     // Strip the current line of the information already processed
     let new_line = line.strip_prefix(full_tag_ptr).unwrap();
     // Return contents of line to continue processing
-    processing_router(new_line.to_string(), tree);
+    processing_router(new_line, tree);
 }
 /// Handles any closing tags that the machine comes across.  The method matches the full closing tag 
 /// with regex, and then looks for just the tag name. After this, the line passed
 /// in is stripped of the information already processed, and the modified line is sent to the processor.
 /// Finally, XMLTree's path disposes of the final XMLElement, since that is no longer the current parent
 fn handle_exit_tag(line: &str, tree: &mut XMLTree) {
-    // lazy_static! {
-    //     static ref RE2: Regex = Regex::new(r"[a-z]+[a-z0-9]*").unwrap();
-    // }
 
     // Find exit tag in its entirety
     let exit_tag_itr: Vec<&str> = line.split_inclusive('>').collect();
-    let exit_tag = exit_tag_itr.get(0).unwrap();
+    let exit_tag = exit_tag_itr[0];
     // Get contents after the exit tag
     let ret_line = line.strip_prefix(exit_tag).expect(line);
     // Pop the current parent from the path
     tree.current_path.pop();
     // Return contents of the exit tag
-    processing_router(ret_line.to_string(), tree);
+    processing_router(ret_line, tree);
     
 }
 /// Function for processing characters.  The characters are matched with a 
@@ -140,35 +137,17 @@ fn handle_characters(line: &str, tree: &mut XMLTree) {
     // Find characters at beginning of line
 
     let text_iter: Vec<&str> = line.splitn(2, '<').collect();
-    let text_wrap = text_iter.get(0).unwrap();
+    let text_wrap = text_iter[0];
 
     // Split the line in portions before and after those characters
     let lin_split: Vec<&str> = line.splitn(2, text_wrap).collect();
     // Get the characters in the line after the character string
-    let ret_line = lin_split.get(1).unwrap();
+    let ret_line = lin_split[1];
     // Get parent of the text
     let root_cell = tree.current_path.last().unwrap();
     // Push text to the parent
     RefCell::try_borrow_mut(root_cell).unwrap().add_text(text_wrap.to_string());
     // Return the trimmed line to the processing router
-    processing_router(ret_line.to_string(), tree);
-}
-/// Handle the properties within the XML opening tag. Properties are handled recursively.
-/// One property is processed at a time.  First a regex is matched, and that property
-/// is fed into a hashmap that the parent has.  The string is then trimmed and the process repeats
-/// until an end tag is found.    
-fn handle_properties(potential_props: String, prop_map: &mut Vec<(String, String)>) { 
-    // End condition for recursion
-    if potential_props.trim().eq(">") {
-        return;
-    }
-    // Trim whitespace from string
-    let potential_props_trim = potential_props.trim_end_matches(|c| c == ' ' || c == '>');
-    let props:Vec<&str> = potential_props_trim.split_ascii_whitespace().collect();
-    for prop in props {
-        let tuple = prop.split_once("=").unwrap();
-        prop_map.push((tuple.0.to_string(), tuple.1.to_string()));
-    } 
-    handle_properties(">".to_string(), prop_map);
+    processing_router(ret_line, tree);
 }
 
